@@ -30,18 +30,17 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('Starting TinyFish POC - SSE Streaming (Simulated)');
-  console.log('Target: https://stripe.com/pricing');
-  console.log('Note: TinyFish does not support native SSE, simulating with polling\n');
+  console.log('Starting TinyFish POC - SSE Streaming');
+  console.log('Target: https://stripe.com/pricing\n');
 
-  console.log('Initiating async run...\n');
+  console.log('Initiating SSE stream...\n');
 
-  // Use run-async endpoint instead
-  const response = await fetch(`${TINYFISH_API}/automation/run-async`, {
+  const response = await fetch(`${TINYFISH_API}/automation/run-sse`, {
     method: 'POST',
     headers: {
       'X-API-Key': API_KEY,
       'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
     },
     body: JSON.stringify({
       url: 'https://stripe.com/pricing',
@@ -50,61 +49,103 @@ async function main() {
     }),
   });
 
+  console.log('Response status:', response.status, response.statusText);
+  console.log('Content-Type:', response.headers.get('content-type'));
+  console.log();
+
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('Failed to start run:', errorText.substring(0, 500));
+    console.error('Failed to start SSE stream:', errorText.substring(0, 500));
     process.exit(1);
   }
 
-  const { run_id } = await response.json();
-  console.log(`[${formatTime()}] EVENT type=STARTED run_id=${run_id}\n`);
-
-  // Simulate SSE by polling and emitting events
-  const POLL_INTERVAL = 3000;
-  let lastStatus = '';
-
-  while (Date.now() - startTime < TIMEOUT) {
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
-
-    const statusResponse = await fetch(`${TINYFISH_API}/runs/${run_id}`, {
-      headers: {
-        'X-API-Key': API_KEY,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!statusResponse.ok) {
-      const errorText = await statusResponse.text();
-      console.error(`Failed to poll status:`, errorText.substring(0, 200));
-      process.exit(1);
-    }
-
-    const statusData = await statusResponse.json();
-    
-    // Emit event only if status changed
-    if (statusData.status !== lastStatus) {
-      console.log(`[${formatTime()}] EVENT type=${statusData.status}`);
-      lastStatus = statusData.status;
-    }
-
-    if (statusData.status === 'COMPLETED') {
-      const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
-      console.log('\n✅ Run completed successfully!');
-      console.log(`⏱️  Total elapsed time: ${elapsedSeconds}s\n`);
-      console.log('Result:');
-      console.log(JSON.stringify(statusData.result, null, 2));
-      console.log('\n📊 Events emitted: STARTED → PENDING → RUNNING → COMPLETED');
-      process.exit(0);
-    }
-
-    if (statusData.status === 'FAILED') {
-      console.error('\n❌ Run failed!');
-      console.error('Error:', statusData.error || 'Unknown error');
-      process.exit(1);
-    }
+  if (!response.body) {
+    console.error('No response body received');
+    process.exit(1);
   }
 
-  console.error('\n⏰ Timeout — TinyFish took too long (>360s / 6 minutes)');
+  console.log('Stream started, reading events...\n');
+
+  // Read the SSE stream
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      // Check timeout
+      if (Date.now() - startTime > TIMEOUT) {
+        console.error('\n⏰ Timeout — TinyFish took too long (>360s / 6 minutes)');
+        reader.cancel();
+        process.exit(1);
+      }
+
+      const { done, value } = await reader.read();
+
+      if (done) {
+        console.log('\n✅ Stream ended');
+        break;
+      }
+
+      // Decode the chunk and add to buffer
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const jsonStr = line.substring(6); // Remove "data: " prefix
+
+          try {
+            const event = JSON.parse(jsonStr) as any;
+            
+            // Handle different event types
+            if (event.type === 'STARTED') {
+              console.log(`[${formatTime()}] EVENT type=STARTED run_id=${event.run_id}`);
+            } else if (event.type === 'STREAMING_URL') {
+              console.log(`[${formatTime()}] EVENT type=STREAMING_URL`);
+              console.log(`           Watch live: ${event.streaming_url}`);
+            } else if (event.type === 'PROGRESS') {
+              console.log(`[${formatTime()}] EVENT type=PROGRESS`);
+              if (event.purpose) {
+                console.log(`           Action: ${event.purpose}`);
+              }
+            } else if (event.type === 'HEARTBEAT') {
+              // Silent - just keep-alive
+            } else if (event.type === 'COMPLETE') {
+              const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(1);
+              console.log(`[${formatTime()}] EVENT type=COMPLETE`);
+              
+              if (event.status === 'COMPLETED') {
+                console.log('\n✅ Run completed successfully!');
+                console.log(`⏱️  Total elapsed time: ${elapsedSeconds}s\n`);
+                console.log('Result:');
+                console.log(JSON.stringify(event.result, null, 2));
+                process.exit(0);
+              } else {
+                console.error('\n❌ Run failed!');
+                console.error('Status:', event.status);
+                console.error('Error:', event.error?.message || 'Unknown error');
+                process.exit(1);
+              }
+            } else {
+              console.log(`[${formatTime()}] EVENT type=${event.type}`);
+            }
+          } catch (parseError) {
+            // Ignore parse errors for non-JSON lines
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Stream error:', error);
+    process.exit(1);
+  }
+
+  // If we get here, stream ended without COMPLETE event
+  console.error('\n❌ Stream ended without completion event');
   process.exit(1);
 }
 
