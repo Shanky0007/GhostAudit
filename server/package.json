@@ -1,0 +1,33 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/websocket": "^11.2.0",
+    "@prisma/client": "^7.5.0",
+    "bullmq": "^5.71.0",
+    "dotenv": "^17.3.1",
+    "fastify": "^5.8.2",
+    "ioredis": "^5.10.1",
+    "p-limit": "^7.3.0",
+    "prisma": "^7.5.0",
+    "zod": "^4.3.6"
+  }
+}
