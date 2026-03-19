@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "poc:single": "tsx src/scripts/poc-single.ts",
     "poc:debug": "tsx src/scripts/poc-debug.ts",
-    "poc:sse": "tsx src/scripts/poc-sse.ts"
+    "poc:sse": "tsx src/scripts/poc-sse.ts",
+    "poc:bulk": "tsx src/scripts/poc-bulk.ts"
   },
   "keywords": [],
   "author": "",
