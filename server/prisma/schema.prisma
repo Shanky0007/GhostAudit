@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model RunBatch {
+  id                String          @id @default(cuid())
+  target_url        String
+  status            String          @default("QUEUED")
+  agent_concurrency Int             @default(2)
+  total_waves       Int             @default(25)
+  current_wave      Int             @default(0)
+  persona_count     Int             @default(50)
+  completed_runs    Int             @default(0)
+  failed_runs       Int             @default(0)
+  anomaly_count     Int             @default(0)
+  health_score      Int?
+  revenue_at_risk   Float?
+  narrative         String?
+  priority_actions  Json?
+  created_at        DateTime        @default(now())
+  completed_at      DateTime?
+  runs              AgentRun[]
+  anomalies         AnomalyRecord[]
+}
+
+model AgentRun {
+  id              String    @id @default(cuid())
+  batch_id        String
+  batch           RunBatch  @relation(fields: [batch_id], references: [id])
+  persona_id      String
+  persona_data    Json
+  revenue_path_id String
+  wave_number     Int
+  status          String    @default("PENDING")
+  tinyfish_run_id String?
+  result          Json?
+  error           String?
+  step_count      Int?
+  started_at      DateTime  @default(now())
+  completed_at    DateTime?
+}
+
+model AnomalyRecord {
+  id                           String   @id @default(cuid())
+  batch_id                     String
+  batch                        RunBatch @relation(fields: [batch_id], references: [id])
+  anomaly_type                 String
+  severity                     String
+  affected_personas            Json
+  affected_segment_description String
+  evidence                     Json
+  estimated_mrr_impact         Float?
+  found_in_wave                Int      @default(0)
+  detected_at                  DateTime @default(now())
+}
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  api_key    String   @unique @default(cuid())
+  created_at DateTime @default(now())
+}
