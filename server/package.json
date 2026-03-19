@@ -10,7 +10,11 @@
     "poc:single": "tsx src/scripts/poc-single.ts",
     "poc:debug": "tsx src/scripts/poc-debug.ts",
     "poc:sse": "tsx src/scripts/poc-sse.ts",
-    "poc:bulk": "tsx src/scripts/poc-bulk.ts"
+    "poc:bulk": "tsx src/scripts/poc-bulk.ts",
+    "prisma:generate": "dotenv -e ../.env -- npx prisma generate",
+    "prisma:push": "dotenv -e ../.env -- npx prisma db push",
+    "prisma:studio": "dotenv -e ../.env -- npx prisma studio",
+    "test:schema": "dotenv -e ../.env -- tsx src/db/test-schema.ts"
   },
   "keywords": [],
   "author": "",
@@ -25,13 +29,14 @@
   "dependencies": {
     "@fastify/cors": "^11.2.0",
     "@fastify/websocket": "^11.2.0",
-    "@prisma/client": "^7.5.0",
+    "@prisma/client": "^5.22.0",
     "bullmq": "^5.71.0",
     "dotenv": "^17.3.1",
+    "dotenv-cli": "^11.0.0",
     "fastify": "^5.8.2",
     "ioredis": "^5.10.1",
     "p-limit": "^7.3.0",
-    "prisma": "^7.5.0",
+    "prisma": "^5.22.0",
     "zod": "^4.3.6"
   }
 }
